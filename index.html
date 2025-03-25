@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steps for Experiment</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 36px;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    button {
+      padding: 5px 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .timer {
+      font-size: 16px;
+      margin-left: 10px;
+      font-weight: bold;
+    }
+    #downloadBtn {
+      margin-top: 20px;
+      display: block;
+      width: 200px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #downloadBtn:disabled {
+      background-color: #cccccc;
+    }
+    #addTaskBtn {
+      margin-top: 20px;
+      display: block;
+      width: 200px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Steps for Experiment</h1>
+
+  <table id="tasksTable">
+    <thead>
+      <tr>
+        <th>Task</th>
+        <th>Timer</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><button id="task1-btn" onclick="startTimer('task1')">Task 1</button> - Set up experiment</td>
+        <td><span id="task1-timer" class="timer">0m 0s</span></td>
+      </tr>
+      <tr>
+        <td><button id="task2-btn" onclick="startTimer('task2')">Task 2</button> - Conduct experiment</td>
+        <td><span id="task2-timer" class="timer">0m 0s</span></td>
+      </tr>
+      <tr>
+        <td><button id="task3-btn" onclick="startTimer('task3')">Task 3</button> - Analyze results</td>
+        <td><span id="task3-timer" class="timer">0m 0s</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <button id="addTaskBtn" onclick="addNewTask()">Add New Task</button>
+  <button id="downloadBtn" onclick="downloadJSON()" disabled>Download Timestamp Data</button>
+
+  <script>
+    let taskCount = 3; // Keep track of the number of tasks (starting from 3)
+    let timestamps = {
+      clickOrder: [] // Now only store click order with description and timestamp
+    };
+    let timers = {};
+    let activeTimer = null;
+    let elapsedTimes = { task1: 0, task2: 0, task3: 0 };
+
+    // Function to start or resume a timer for a task
+    function startTimer(task) {
+      const timerElement = document.getElementById(`${task}-timer`);
+      let startTime;
+
+      // Get the task description from the button's text or input field
+      const taskButton = document.getElementById(`${task}-btn`);
+      const taskDescriptionElement = taskButton.parentElement;
+      let taskDescription = taskDescriptionElement.textContent.split(' - ')[1];
+
+      // For newly added tasks, use the entered description
+      if (taskDescriptionElement.querySelector('input')) {
+        taskDescription = taskDescriptionElement.querySelector('input').value || `Task ${taskCount}`;
+      }
+
+      // Record the timestamp whenever the button is clicked and store task number, description
+      const clickTimestamp = new Date().toISOString();
+      timestamps.clickOrder.push({ clickTimestamp, taskNumber: task.replace('task', ''), taskDescription });
+
+      // If this task was previously clicked and has a stored elapsed time, resume from that point
+      if (elapsedTimes[task] > 0) {
+        startTime = Date.now() - elapsedTimes[task] * 1000;
+      } else {
+        startTime = Date.now();
+      }
+
+      // Stop the active timer if one is already running
+      if (activeTimer !== null && activeTimer !== task) {
+        clearInterval(timers[activeTimer]);
+      }
+
+      // Start or resume updating the timer display
+      timers[task] = setInterval(function() {
+        let elapsed = Math.floor((Date.now() - startTime) / 1000);
+        elapsedTimes[task] = elapsed; // Update the elapsed time for the task
+        let minutes = Math.floor(elapsed / 60);
+        let seconds = elapsed % 60;
+        timerElement.textContent = `${minutes}m ${seconds}s`;
+      }, 1000);
+
+      // Disable the clicked button
+      document.getElementById(`${task}-btn`).disabled = true;
+
+      // Re-enable the previously clicked button if it exists
+      if (activeTimer !== null && activeTimer !== task) {
+        document.getElementById(`${activeTimer}-btn`).disabled = false;
+      }
+
+      // Update the active timer
+      activeTimer = task;
+
+      // Enable the download button
+      document.getElementById("downloadBtn").disabled = false;
+    }
+
+    // Function to download the timestamps as a JSON file
+    function downloadJSON() {
+      const blob = new Blob([JSON.stringify(timestamps, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'timestamps.json';
+      link.click();
+    }
+
+    // Function to add a new task row
+    function addNewTask() {
+      taskCount++; // Increment the task count
+      const tableBody = document.querySelector('#tasksTable tbody');
+      const newRow = document.createElement('tr');
+
+      // Add a new row with a button and description input
+      newRow.innerHTML = `
+        <td>
+          <button id="task${taskCount}-btn" onclick="startTimer('task${taskCount}')">Task ${taskCount}</button>
+          - <input type="text" id="task${taskCount}-desc" placeholder="Enter task description" />
+        </td>
+        <td><span id="task${taskCount}-timer" class="timer">0m 0s</span></td>
+      `;
+
+      // Append the new row to the table
+      tableBody.appendChild(newRow);
+
+      // Initialize the new task in the timestamps object
+      elapsedTimes[`task${taskCount}`] = 0;
+    }
+  </script>
+
+</body>
+</html>
